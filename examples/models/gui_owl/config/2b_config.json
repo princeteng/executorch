@@ -1,0 +1,22 @@
+{
+  "dim": 2048,
+  "ffn_dim_multiplier": 1,
+  "hidden_dim": 6144,
+  "n_heads": 16,
+  "head_dim": 128,
+  "n_kv_heads": 8,
+  "n_layers": 28,
+  "norm_eps": 1e-06,
+  "rope_theta": 5000000,
+  "use_scaled_rope": false,
+  "vocab_size": 151936,
+  "use_hf_rope": true,
+  "attention_qkv_bias": false,
+  "use_qk_norm": true,
+  "qk_norm_before_rope": true,
+  "rope_scaling": {
+    "mrope_interleaved": true,
+    "mrope_section": [24, 20, 20],
+    "rope_type": "default"
+  }
+}

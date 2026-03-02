@@ -16,6 +16,7 @@ from executorch.examples.qualcomm.oss_scripts.llama.encoder.encoder_quant_recipe
 from executorch.examples.qualcomm.oss_scripts.llama.model.vision_encoder import (
     Idefics3VisionEncoder,
     InternVL3VisionEncoder,
+    Qwen3VLVisionEncoder,
 )
 
 
@@ -88,3 +89,23 @@ class InternVL3Encoder(VisionModalityConfig):
     img_resized_w = 448
     img_url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     quant_recipe = InternVL3_Encoder_QuantRecipe
+
+
+@dataclass(init=False, frozen=True)
+class GUIOwlEncoder(VisionModalityConfig):
+    """
+    Config for GUI-Owl-1.5-2B-Instruct (Qwen3VL-based) vision encoder.
+
+    GUI-Owl is based on Qwen3VL which uses:
+    - Dynamic resolution support via spatial_merge_size=2
+    - Patch size of 16 with temporal_patch_size of 2
+    - Vision encoder with 24 layers, 1024 hidden size
+    - Output projection to 2048 dimensions
+    """
+
+    encoder_class = Qwen3VLVisionEncoder
+    img_seq_len = 256  # (512/16)^2 / (spatial_merge_size^2) = 1024/4 = 256
+    img_resized_h = 512
+    img_resized_w = 512
+    img_url = "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+    quant_recipe = InternVL3_Encoder_QuantRecipe  # Use same quant recipe as InternVL3

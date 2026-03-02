@@ -25,6 +25,11 @@ from transformers.models.internvl.modeling_internvl import (
     InternVLMultiModalProjector,
     InternVLVisionModel,
 )
+from transformers.models.qwen3_vl.modeling_qwen3_vl import (
+    Qwen3VLConfig,
+    Qwen3VLVisionModel,
+    Qwen3VLVisionPatchMerger,
+)
 
 
 # Custom implementation based on `transformers/models/idefics3/modeling_idefics3/Idefics3VisionEmbeddings.py` (Transformers v5.0.0rc1)
@@ -371,4 +376,78 @@ class InternVL3VisionEncoder(torch.nn.Module):
 
         # Project features through multi-modal projector
         vision_features = self.multi_modal_projector(vision_features)
+        return vision_features
+
+
+# Custom implementation for Qwen3VL-based models (e.g., GUI-Owl-1.5-2B-Instruct)
+# Based on transformers/models/qwen3_vl/modeling_qwen3_vl.py
+class Qwen3VLVisionEncoder(torch.nn.Module):
+    """
+    Vision encoder for Qwen3VL-based models like GUI-Owl-1.5-2B-Instruct.
+
+    Qwen3VL uses a ViT-style vision encoder with:
+    - Patch embedding using Conv3d
+    - Position embeddings
+    - Vision transformer blocks with rotary position embeddings
+    - Patch merger for spatial downsampling
+
+    The model supports dynamic resolution through spatial_merge_size.
+    """
+    def __init__(
+        self, config: Qwen3VLConfig, img_resized_h: int = 512, img_resized_w: int = 512
+    ):
+        super(Qwen3VLVisionEncoder, self).__init__()
+        self.vision_tower = Qwen3VLVisionModel(config.vision_config)
+        self.patch_merger = Qwen3VLVisionPatchMerger(config.vision_config)
+        self.config = config
+        self.img_resized_h = img_resized_h
+        self.img_resized_w = img_resized_w
+
+        # Get vision config parameters
+        self.spatial_merge_size = config.vision_config.spatial_merge_size
+        self.patch_size = config.vision_config.patch_size
+        self.temporal_patch_size = config.vision_config.temporal_patch_size
+        self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
+
+    def preprocess(self, pixel_values: Tuple[torch.FloatTensor]) -> Tuple[torch.Tensor]:
+        """Preprocess pixel values for Qwen3VL vision encoder."""
+        return pixel_values
+
+    def get_example_inputs(self):
+        """Returns example input tensor for tracing."""
+        return (
+            torch.randn(
+                (1, 3, self.img_resized_h, self.img_resized_w), dtype=torch.float32
+            ),
+        )
+
+    def forward(
+        self,
+        pixel_values: torch.FloatTensor,
+    ) -> torch.Tensor:
+        """
+        Encodes images into continuous embeddings for the language model.
+
+        Qwen3VL handles dynamic resolution by:
+        1. Using patch embedding that works with arbitrary image sizes
+        2. Applying spatial merge to reduce sequence length
+        3. The patch merger adapts to different input resolutions
+
+        Args:
+            pixel_values: Tensor of shape (batch_size, channels, height, width)
+
+        Returns:
+            vision_features: Image features of shape (batch_size, seq_len, out_hidden_size)
+        """
+        # Get vision features from vision tower
+        # The vision tower handles variable resolution inputs
+        vision_outputs = self.vision_tower(pixel_values=pixel_values)
+
+        # The vision tower already applies the patch merger internally
+        # Returns features already in the correct shape
+        if isinstance(vision_outputs, tuple):
+            vision_features = vision_outputs[0]
+        else:
+            vision_features = vision_outputs.last_hidden_state
+
         return vision_features

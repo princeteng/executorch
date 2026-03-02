@@ -9,11 +9,13 @@ from executorch.examples.qualcomm.oss_scripts.llama.encoder.encoder_config impor
     MultiModalityConfig,
     SmolVLMEncoder,
     VisionModalityConfig,
+    GUIOwlEncoder,
 )
 from executorch.examples.qualcomm.oss_scripts.llama.encoder.encoder_quant_recipe import (
     EncoderQuantRecipe,
     InternVL3_Encoder_QuantRecipe,
     SmolVLM_Encoder_QuantRecipe,
+    GUIOwl_Encoder_QuantRecipe,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "SmolVLMEncoder",
     "SmolVLM_Encoder_QuantRecipe",
     "VisionModalityConfig",
+    "GUIOwlEncoder",
+    "GUIOwl_Encoder_QuantRecipe",
 ]

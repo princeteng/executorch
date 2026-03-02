@@ -150,6 +150,12 @@ SpecialTokens get_special_tokens(
       tokens.fake_wrap_start = "<img>";
       tokens.fake_wrap_end = "</img>";
       break;
+    case example::MultimodalDecoderModelVersion::kGuiOwl: // gui_owl_2b_instruct
+      tokens.image_token = "<|vision_token|>";
+      tokens.global_img = "";
+      tokens.fake_wrap_start = "<|image_start|>";
+      tokens.fake_wrap_end = "<|image_end|>";
+      break;
     default:
       break;
   }

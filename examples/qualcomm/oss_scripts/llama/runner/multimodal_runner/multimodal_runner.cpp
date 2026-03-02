@@ -122,6 +122,8 @@ MultimodalRunner<T>::MultimodalRunner(
     decoder_model_version_ = MultimodalDecoderModelVersion::kSmolvlm;
   } else if (decoder_model_version == "internvl3") {
     decoder_model_version_ = MultimodalDecoderModelVersion::kInternvl3;
+  } else if (decoder_model_version == "gui_owl") {
+    decoder_model_version_ = MultimodalDecoderModelVersion::kGuiOwl;
   } else {
     ET_CHECK_MSG(false, "Unsupported Decoder Model");
   }

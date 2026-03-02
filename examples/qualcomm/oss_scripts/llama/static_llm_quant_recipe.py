@@ -700,3 +700,30 @@ class SmolVLMQuantRecipe(StaticLLMQuantRecipe):
             act_observer=MinMaxObserver,
             granularity=QuantGranularity.PER_CHANNEL,
         )
+
+
+class GUIOwl_2B_QuantRecipe(StaticLLMQuantRecipe):
+    """
+    Quantization recipe for GUI-Owl-1.5-2B-Instruct.
+    Based on Qwen3 architecture with vision encoder.
+    """
+    default_quant_dtype = QuantDtype.use_16a8w
+
+    def __init__(self, verbose: bool = False):
+        super().__init__()
+
+        self.recipe = QuantRecipe(
+            self.default_quant_dtype,
+            False,
+            act_observer=MinMaxObserver,
+            granularity=QuantGranularity.PER_TENSOR,
+            verbose=verbose,
+        ).add_node_target(
+            {
+                torch.ops.aten.conv2d.default,
+            },
+            QuantDtype.use_16a8w,
+            False,
+            act_observer=MinMaxObserver,
+            granularity=QuantGranularity.PER_CHANNEL,
+        )

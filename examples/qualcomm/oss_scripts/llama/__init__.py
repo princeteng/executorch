@@ -41,6 +41,9 @@ from executorch.examples.models.smollm3 import (
 from executorch.examples.models.smolvlm import (
     convert_weights as convert_smolvlm_weights,
 )
+from executorch.examples.models.gui_owl import (
+    convert_weights as convert_gui_owl_weights,
+)
 
 from executorch.examples.qualcomm.oss_scripts.llama.decoder_constants import (
     DECODER_MODEL_VERSION,
@@ -78,6 +81,7 @@ from executorch.examples.qualcomm.oss_scripts.llama.static_llm_quant_recipe impo
     Smollm2QuantRecipe,
     Smollm3QuantRecipe,
     SmolVLMQuantRecipe,
+    GUIOwl_2B_QuantRecipe,
     StaticLLMQuantRecipe,
 )
 from tabulate import tabulate
@@ -557,3 +561,37 @@ class SmolVLM_500M(LLMModelConfig):
     r2 = False
     r3 = False
     quant_recipe = SmolVLMQuantRecipe
+
+
+@register_llm_model(
+    "gui_owl_2b_instruct",
+    vision_encoder=GUIOwlEncoder,
+)
+@dataclass(init=False, frozen=True)
+class GUIOwl_2B_Instruct(LLMModelConfig):
+    """
+    GUI-Owl-1.5-2B-Instruct model configuration.
+
+    GUI-Owl is a vision-language model based on Qwen3VL architecture,
+    designed for GUI understanding and interaction tasks.
+
+    Key features:
+    - Based on Qwen3VL architecture with dynamic resolution support
+    - Vision encoder with spatial merge for efficient processing
+    - 2B parameters text decoder
+    - Supports image-guided conversations
+    """
+    repo_id: str = "mPLUG/GUI-Owl-1.5-2B-Instruct"
+    params_path: str = os.path.join(
+        BASE_DIR, "../../../models/gui_owl/2b_config.json"
+    )
+    convert_weights = convert_gui_owl_weights
+    transform_weight = False
+    instruct_model = True
+    num_sharding = 1
+    masked_softmax = True
+    seq_mse_candidates = 0
+    r1 = False
+    r2 = False
+    r3 = False
+    quant_recipe = GUIOwl_2B_QuantRecipe
