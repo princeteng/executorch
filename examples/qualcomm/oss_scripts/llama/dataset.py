@@ -77,27 +77,33 @@ class DatasetBuilder:
             GUIOwlEncoder,
         )
 
-        if isinstance(config, GUIOwlEncoder):
+        if issubclass(config, GUIOwlEncoder):
             # Qwen3VL-based models: use shortest_edge/longest_edge format
             # Setting both to the same value forces square resize, bypassing smart_resize
             size = {
                 "shortest_edge": config.img_resized_h,
                 "longest_edge": config.img_resized_w,
             }
+            # Qwen3VL processor doesn't support crop_to_patches
+            pixel_values = processor(
+                text=prompt,
+                images=[image],
+                return_tensors="pt",
+                size=size,
+            ).pixel_values
         else:
             # Default format for InternVL3, SmolVLM, etc.
             size = {
                 "height": config.img_resized_h,
                 "width": config.img_resized_w,
             }
-
-        pixel_values = processor(
-            text=prompt,
-            images=[image],
-            return_tensors="pt",
-            crop_to_patches=False,
-            size=size,
-        ).pixel_values
+            pixel_values = processor(
+                text=prompt,
+                images=[image],
+                return_tensors="pt",
+                crop_to_patches=False,
+                size=size,
+            ).pixel_values
 
         # save image file for runtime evaluation
         pixel_values.detach().numpy().tofile(
