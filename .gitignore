@@ -5,7 +5,6 @@
 .hypothesis
 .mypy_cache/
 .venv/
-.bin/
 __pycache__/
 
 # Build and tool-generated files
