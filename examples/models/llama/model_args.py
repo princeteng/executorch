@@ -109,6 +109,8 @@ class ModelArgs:
     use_scaled_rope: bool = False  # Use scaled RoPE, introduced in llama3.1.
     rope_scale_factor: int = 8
     high_freq_factor: int = 4
+    # Rope scaling configuration for advanced RoPE types (e.g., mrope for Qwen3VL)
+    rope_scaling: Optional[Dict[str, Any]] = None
     # Additional Model Metadata needed at runtime
     bos_idx: int = 1
     eos_idx: int = 3
