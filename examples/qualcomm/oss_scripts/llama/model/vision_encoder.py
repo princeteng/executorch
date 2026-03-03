@@ -416,8 +416,10 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         )
 
         # Position embeddings
+        max_position_embeddings = getattr(vision_config, 'num_position_embeddings',
+                                          getattr(vision_config, 'max_position_embedding', 1024))
         self.position_embedding = nn.Embedding(
-            vision_config.max_position_embedding, vision_config.hidden_size
+            max_position_embeddings, vision_config.hidden_size
         )
 
         # Register position ids buffer
