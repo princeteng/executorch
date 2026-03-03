@@ -386,8 +386,8 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
     Vision encoder for Qwen3VL-based models like GUI-Owl-1.5-2B-Instruct.
 
     Qwen3VL uses a ViT-style vision encoder with:
-    - Patch embedding using Conv2d
-    - Position embeddings
+    - Patch embedding using Conv3d
+    - Position embeddings with mrope
     - Vision transformer blocks with rotary position embeddings
     - Patch merger for spatial downsampling
 
@@ -400,31 +400,10 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         super(Qwen3VLVisionEncoder, self).__init__()
         vision_config = config.vision_config
 
-        # Build patch embedding layer similar to Qwen3VL
         self.patch_size = vision_config.patch_size
         self.temporal_patch_size = vision_config.temporal_patch_size
         self.spatial_merge_size = vision_config.spatial_merge_size
-        self.in_channels = getattr(vision_config, 'in_channels', 3)  # Default to 3 for RGB
-
-        # Patch embedding: [B, C, H, W] -> [B, num_patches, hidden_size]
-        self.patch_embed = nn.Conv2d(
-            in_channels=self.in_channels,
-            out_channels=vision_config.hidden_size,
-            kernel_size=(self.patch_size, self.patch_size),
-            stride=(self.patch_size, self.patch_size),
-            padding="valid",
-        )
-
-        # Position embeddings
-        max_position_embeddings = getattr(vision_config, 'num_position_embeddings',
-                                          getattr(vision_config, 'max_position_embedding', 1024))
-        self.position_embedding = nn.Embedding(
-            max_position_embeddings, vision_config.hidden_size
-        )
-
-        # Register position ids buffer
-        position_ids = torch.arange(max_position_embeddings).expand((1, -1))
-        self.register_buffer("position_ids", position_ids, persistent=False)
+        self.embed_dim = vision_config.hidden_size
 
         # Use the vision transformer from transformers
         self.vision_tower = Qwen3VLVisionModel(vision_config)
@@ -434,16 +413,40 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         self.img_resized_h = img_resized_h
         self.img_resized_w = img_resized_w
 
-    def _get_grid_size(self, pixel_values: torch.Tensor) -> torch.Tensor:
-        """Calculate grid size (T, H, W) for the input images."""
+    def _pack_pixel_values(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """
+        Pack pixel values into the format expected by Qwen3VL.
+        Qwen3VL expects: [num_patches, channels, temporal_patch_size, patch_h, patch_w]
+        """
         B, C, H, W = pixel_values.shape
-        # Calculate number of patches in height and width
-        # For Qwen3VL, we use temporal_patch_size=2, so T = 1 (for images)
-        h_patches = H // (self.patch_size * self.spatial_merge_size)
-        w_patches = W // (self.patch_size * self.spatial_merge_size)
-        t_patches = 1  # For images (not videos)
+        patch_size = self.patch_size
+        temporal_patch_size = self.temporal_patch_size
 
-        # grid_thw: [T, H, W] for each image in the batch
+        # Calculate number of patches
+        h_patches = H // patch_size
+        w_patches = W // patch_size
+
+        # Reshape to extract patches: [B, C, h_patches, patch_h, w_patches, patch_w]
+        pixel_values = pixel_values.view(B, C, h_patches, patch_size, w_patches, patch_size)
+        # Permute to [B, h_patches, w_patches, C, patch_h, patch_w]
+        pixel_values = pixel_values.permute(0, 2, 4, 1, 3, 5)
+        # Reshape to [B * h_patches * w_patches, C, patch_h, patch_w]
+        pixel_values = pixel_values.reshape(B * h_patches * w_patches, C, patch_size, patch_size)
+
+        # For images (not videos), we need to add temporal dimension
+        # Repeat the patch temporal_patch_size times: [num_patches, C, temporal_patch_size, patch_h, patch_w]
+        pixel_values = pixel_values.unsqueeze(2).expand(-1, -1, temporal_patch_size, -1, -1)
+
+        return pixel_values
+
+    def _get_grid_thw(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """Calculate grid_thw for Qwen3VL."""
+        B, C, H, W = pixel_values.shape
+        h_patches = H // self.patch_size
+        w_patches = W // self.patch_size
+        # grid_thw: [batch_size, 3] where 3 is (T, H, W)
+        # For images, T = 1 (after temporal patch merging)
+        t_patches = 1
         grid_thw = torch.tensor(
             [[t_patches, h_patches, w_patches]], dtype=torch.long, device=pixel_values.device
         )
@@ -468,38 +471,26 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         """
         Encodes images into continuous embeddings for the language model.
 
-        Qwen3VL handles dynamic resolution by:
-        1. Using patch embedding that works with arbitrary image sizes
-        2. Applying spatial merge to reduce sequence length
-        3. The patch merger adapts to different input resolutions
-
         Args:
             pixel_values: Tensor of shape (batch_size, channels, height, width)
 
         Returns:
             vision_features: Image features of shape (batch_size, seq_len, out_hidden_size)
         """
-        # Get grid size for the current input
-        grid_thw = self._get_grid_size(pixel_values)
+        # Pack pixel values into Qwen3VL format
+        packed_pixels = self._pack_pixel_values(pixel_values)
 
-        # Create patch embeddings
-        # [B, C, H, W] -> [B, num_patches, hidden_size]
-        patch_embeds = self.patch_embed(pixel_values)
-        B, hidden_size, h, w = patch_embeds.shape
-        hidden_states = patch_embeds.reshape(B, hidden_size, h * w).transpose(1, 2)
+        # Get grid_thw
+        grid_thw = self._get_grid_thw(pixel_values)
 
-        # Add position embeddings
-        seq_len = hidden_states.shape[1]
-        position_ids = self.position_ids[:, :seq_len]
-        hidden_states = hidden_states + self.position_embedding(position_ids)
-
-        # Get vision features from vision tower with required arguments
+        # Call vision tower with packed pixel values
+        # Qwen3VLVisionModel.forward expects hidden_states (packed pixels) and grid_thw
         vision_outputs = self.vision_tower(
-            hidden_states=hidden_states,
+            hidden_states=packed_pixels,
             grid_thw=grid_thw,
         )
 
-        # The vision tower returns the features
+        # Get vision features
         if isinstance(vision_outputs, tuple):
             vision_features = vision_outputs[0]
         else:
