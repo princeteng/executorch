@@ -69,15 +69,34 @@ class DatasetBuilder:
         # Process image with text prompt using HuggingFace processor
         # Some HF processors (e.g. InternVL3) need to pass text arg or it will cause error and process failed
         processor = AutoProcessor.from_pretrained(self.repo_id)
+
+        # Qwen3VL/Qwen2VL processors use smart_resize which expects size in format:
+        # {"shortest_edge": ..., "longest_edge": ...} for dynamic resolution
+        # For fixed resolution, pass both as the same value to get square resize
+        from executorch.examples.qualcomm.oss_scripts.llama.encoder.encoder_config import (
+            GUIOwlEncoder,
+        )
+
+        if isinstance(config, GUIOwlEncoder):
+            # Qwen3VL-based models: use shortest_edge/longest_edge format
+            # Setting both to the same value forces square resize, bypassing smart_resize
+            size = {
+                "shortest_edge": config.img_resized_h,
+                "longest_edge": config.img_resized_w,
+            }
+        else:
+            # Default format for InternVL3, SmolVLM, etc.
+            size = {
+                "height": config.img_resized_h,
+                "width": config.img_resized_w,
+            }
+
         pixel_values = processor(
             text=prompt,
             images=[image],
             return_tensors="pt",
             crop_to_patches=False,
-            size={
-                "height": config.img_resized_h,
-                "width": config.img_resized_w,
-            },
+            size=size,
         ).pixel_values
 
         # save image file for runtime evaluation

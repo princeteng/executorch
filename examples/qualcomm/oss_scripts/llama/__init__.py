@@ -51,6 +51,7 @@ from executorch.examples.qualcomm.oss_scripts.llama.decoder_constants import (
 )
 
 from executorch.examples.qualcomm.oss_scripts.llama.encoder.encoder_config import (
+    GUIOwlEncoder,
     InternVL3Encoder,
     MultiModalityConfig,
     SmolVLMEncoder,

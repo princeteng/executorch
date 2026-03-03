@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from executorch.examples.qualcomm.oss_scripts.llama.encoder.encoder_quant_recipe import (
     EncoderQuantRecipe,
+    GUIOwl_Encoder_QuantRecipe,
     InternVL3_Encoder_QuantRecipe,
     SmolVLM_Encoder_QuantRecipe,
 )
@@ -104,8 +105,8 @@ class GUIOwlEncoder(VisionModalityConfig):
     """
 
     encoder_class = Qwen3VLVisionEncoder
-    img_seq_len = 256  # (512/16)^2 / (spatial_merge_size^2) = 1024/4 = 256
-    img_resized_h = 512
-    img_resized_w = 512
+    img_seq_len = 576  # (768/16)^2 / (spatial_merge_size^2) = 2304/4 = 576
+    img_resized_h = 768
+    img_resized_w = 768
     img_url = "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
-    quant_recipe = InternVL3_Encoder_QuantRecipe  # Use same quant recipe as InternVL3
+    quant_recipe = GUIOwl_Encoder_QuantRecipe
