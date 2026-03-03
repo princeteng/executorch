@@ -404,10 +404,11 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         self.patch_size = vision_config.patch_size
         self.temporal_patch_size = vision_config.temporal_patch_size
         self.spatial_merge_size = vision_config.spatial_merge_size
+        self.in_channels = getattr(vision_config, 'in_channels', 3)  # Default to 3 for RGB
 
         # Patch embedding: [B, C, H, W] -> [B, num_patches, hidden_size]
         self.patch_embed = nn.Conv2d(
-            in_channels=vision_config.num_channels,
+            in_channels=self.in_channels,
             out_channels=vision_config.hidden_size,
             kernel_size=(self.patch_size, self.patch_size),
             stride=(self.patch_size, self.patch_size),
