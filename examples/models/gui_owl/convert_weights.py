@@ -1,5 +1,5 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
+# All rights reserved
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
@@ -13,20 +13,23 @@ from executorch.examples.models.checkpoint import get_mapped_key
 from executorch.examples.models.smollm3.convert_weights import load_checkpoint
 
 # Weight mapping from HuggingFace Qwen3VL format to Meta format
-# Based on Qwen3VLForConditionalGeneration architecture
+# GUI-Owl uses standard Qwen3 style (without language_model. prefix)
 _QWEN3VL_TO_META = {
-    # Text decoder weights
-    "language_model.model.embed_tokens.weight": "tok_embeddings.weight",
-    "language_model.model.norm.weight": "norm.weight",
-    "language_model.model.layers.{}.self_attn.q_proj.weight": "layers.{}.attention.wq.weight",
-    "language_model.model.layers.{}.self_attn.k_proj.weight": "layers.{}.attention.wk.weight",
-    "language_model.model.layers.{}.self_attn.v_proj.weight": "layers.{}.attention.wv.weight",
-    "language_model.model.layers.{}.self_attn.o_proj.weight": "layers.{}.attention.wo.weight",
-    "language_model.model.layers.{}.input_layernorm.weight": "layers.{}.attention_norm.weight",
-    "language_model.model.layers.{}.post_attention_layernorm.weight": "layers.{}.ffn_norm.weight",
-    "language_model.model.layers.{}.mlp.gate_proj.weight": "layers.{}.feed_forward.w1.weight",
-    "language_model.model.layers.{}.mlp.down_proj.weight": "layers.{}.feed_forward.w2.weight",
-    "language_model.model.layers.{}.mlp.up_proj.weight": "layers.{}.feed_forward.w3.weight",
+    # Text decoder weights - Qwen3 style
+    "model.embed_tokens.weight": "tok_embeddings.weight",
+    "model.norm.weight": "norm.weight",
+    "model.layers.{}.self_attn.q_proj.weight": "layers.{}.attention.wq.weight",
+    "model.layers.{}.self_attn.k_proj.weight": "layers.{}.attention.wk.weight",
+    "model.layers.{}.self_attn.v_proj.weight": "layers.{}.attention.wv.weight",
+    "model.layers.{}.self_attn.o_proj.weight": "layers.{}.attention.wo.weight",
+    "model.layers.{}.input_layernorm.weight": "layers.{}.attention_norm.weight",
+    "model.layers.{}.post_attention_layernorm.weight": "layers.{}.ffn_norm.weight",
+    "model.layers.{}.mlp.gate_proj.weight": "layers.{}.feed_forward.w1.weight",
+    "model.layers.{}.mlp.down_proj.weight": "layers.{}.feed_forward.w2.weight",
+    "model.layers.{}.mlp.up_proj.weight": "layers.{}.feed_forward.w3.weight",
+    # Qwen3VL may have q_norm and k_norm for QK normalization
+    "model.layers.{}.self_attn.q_norm.weight": "layers.{}.attention.q_norm_fn.weight",
+    "model.layers.{}.self_attn.k_norm.weight": "layers.{}.attention.k_norm_fn.weight",
 }
 
 
@@ -45,6 +48,7 @@ def qwen3vl_tune_to_meta(
         Dict[str, torch.Tensor]: State dict in Meta format for text decoder.
     """
     converted_text_model_state_dict = {}
+
     for key, value in state_dict.items():
         try:
             new_key = get_mapped_key(key, _QWEN3VL_TO_META)
@@ -53,17 +57,20 @@ def qwen3vl_tune_to_meta(
             # Only preserve parameters of text decoder, skip vision encoder and projector
             pass
 
-    # Handle tied embeddings - if no lm_head, tie to token embeddings
+    # Handle output weight - if no lm_head, use tied embeddings
     if "output.weight" not in converted_text_model_state_dict:
-        if "language_model.lm_head.weight" in state_dict:
-            converted_text_model_state_dict["output.weight"] = state_dict[
-                "language_model.lm_head.weight"
-            ]
-        else:
+        if "lm_head.weight" in state_dict:
+            converted_text_model_state_dict["output.weight"] = state_dict["lm_head.weight"]
+        elif "tok_embeddings.weight" in converted_text_model_state_dict:
             # Tied embeddings
             converted_text_model_state_dict["output.weight"] = converted_text_model_state_dict[
                 "tok_embeddings.weight"
             ]
+        else:
+            raise KeyError(
+                "Could not find lm_head weight or tok_embeddings for tied embeddings. "
+                f"Available keys: {list(state_dict.keys())[:10]}..."
+            )
 
     return converted_text_model_state_dict
 
