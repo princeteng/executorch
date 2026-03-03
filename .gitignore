@@ -6,7 +6,6 @@
 .mypy_cache/
 .venv/
 .bin/
-.lib/
 __pycache__/
 
 # Build and tool-generated files
