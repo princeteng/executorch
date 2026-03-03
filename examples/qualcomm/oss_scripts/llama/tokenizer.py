@@ -31,6 +31,12 @@ VLM_SPECIAL_TOKENS = {
         "fake_wrap_start": "<img>",
         "fake_wrap_end": "</img>",
     },
+    "gui_owl_2b_instruct": {
+        # Qwen3VL-based model uses <|vision_start|>, <|image_pad|>, <|vision_end|>
+        "image_token": "<|image_pad|>",
+        "fake_wrap_start": "<|vision_start|>",
+        "fake_wrap_end": "<|vision_end|>",
+    },
 }
 # TODO: add special tokens Audio-Language Model
 ALM_SPECIAL_TOKENS = {}
