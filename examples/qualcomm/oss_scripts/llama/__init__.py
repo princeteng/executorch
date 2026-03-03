@@ -584,7 +584,7 @@ class GUIOwl_2B_Instruct(LLMModelConfig):
     """
     repo_id: str = "mPLUG/GUI-Owl-1.5-2B-Instruct"
     params_path: str = os.path.join(
-        BASE_DIR, "../../../models/gui_owl/2b_config.json"
+        BASE_DIR, "../../../models/gui_owl/config/2b_config.json"
     )
     convert_weights = convert_gui_owl_weights
     transform_weight = False
