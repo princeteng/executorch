@@ -423,7 +423,7 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         )
 
         # Register position ids buffer
-        position_ids = torch.arange(vision_config.max_position_embedding).expand((1, -1))
+        position_ids = torch.arange(max_position_embeddings).expand((1, -1))
         self.register_buffer("position_ids", position_ids, persistent=False)
 
         # Use the vision transformer from transformers
