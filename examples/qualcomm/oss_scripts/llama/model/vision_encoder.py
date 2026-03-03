@@ -391,7 +391,7 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
     - Vision transformer blocks with rotary position embeddings
     - Patch merger for spatial downsampling
 
-    The model supports dynamic resolution through spatial_merge_size.
+    For fixed resolution scenarios, grid_thw is pre-computed during initialization.
     """
 
     def __init__(
@@ -412,6 +412,16 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         self.config = config
         self.img_resized_h = img_resized_h
         self.img_resized_w = img_resized_w
+
+        # Pre-calculate grid_thw for fixed resolution
+        h_patches = img_resized_h // self.patch_size
+        w_patches = img_resized_w // self.patch_size
+        t_patches = 1  # For images (not videos)
+        grid_thw = torch.tensor([[t_patches, h_patches, w_patches]], dtype=torch.long)
+        self.register_buffer("grid_thw", grid_thw, persistent=False)
+
+        # Pre-calculate number of patches for packing
+        self.num_patches = h_patches * w_patches
 
     def _pack_pixel_values(self, pixel_values: torch.Tensor) -> torch.Tensor:
         """
@@ -438,19 +448,6 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         pixel_values = pixel_values.unsqueeze(2).expand(-1, -1, temporal_patch_size, -1, -1)
 
         return pixel_values
-
-    def _get_grid_thw(self, pixel_values: torch.Tensor) -> torch.Tensor:
-        """Calculate grid_thw for Qwen3VL."""
-        B, C, H, W = pixel_values.shape
-        h_patches = H // self.patch_size
-        w_patches = W // self.patch_size
-        # grid_thw: [batch_size, 3] where 3 is (T, H, W)
-        # For images, T = 1 (after temporal patch merging)
-        t_patches = 1
-        grid_thw = torch.tensor(
-            [[t_patches, h_patches, w_patches]], dtype=torch.long, device=pixel_values.device
-        )
-        return grid_thw
 
     def preprocess(self, pixel_values: Tuple[torch.FloatTensor]) -> Tuple[torch.Tensor]:
         """Preprocess pixel values for Qwen3VL vision encoder."""
@@ -480,8 +477,8 @@ class Qwen3VLVisionEncoder(torch.nn.Module):
         # Pack pixel values into Qwen3VL format
         packed_pixels = self._pack_pixel_values(pixel_values)
 
-        # Get grid_thw
-        grid_thw = self._get_grid_thw(pixel_values)
+        # Use pre-computed grid_thw for fixed resolution
+        grid_thw = self.grid_thw
 
         # Call vision tower with packed pixel values
         # Qwen3VLVisionModel.forward expects hidden_states (packed pixels) and grid_thw
